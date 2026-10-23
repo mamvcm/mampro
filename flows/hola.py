@@ -1,25 +1,48 @@
-from prefect import flow, task
+from prefect import flow, task, get_run_logger
+from prefect.artifacts import create_markdown_artifact
+
 
 @task
-def extraer() -> list[int]:
-    print("Extrayendo datos...")
-    return [1, 2, 3, 4, 5]
+def generar_saludo(nombre: str) -> str:
+    """Task que procesa el saludo."""
+    logger = get_run_logger()
+    mensaje = f"Hola, {nombre}!"
+    print(mensaje)  # Se imprimirá en los logs gracias a log_prints=True
+    logger.info("Este flow se ejecutó dentro de un contenedor Docker")
+    return mensaje
+
 
 @task
-def transformar(datos: list[int]) -> list[int]:
-    print("Transformando datos...")
-    return [n * 10 for n in datos]
+def crear_reporte_saludo(nombre: str, mensaje: str):
+    """Task encargada de registrar el artefacto en la interfaz de Prefect."""
+    # Estructuramos el contenido en formato Markdown
+    contenido_markdown = f"""
+    # 🚀 Reporte de Ejecución - Hola Mundo
+    
+    El flujo de saludo se ha completado correctamente dentro del contenedor.
+    
+    ### Detalles:
+    - **Usuario saludado:** `{nombre}`
+    - **Mensaje generado:** *"{mensaje}"*
+    - **Entorno:** Contenedor Docker 🐳
+    """
+    
+    # Creamos el artefacto visible en la UI
+    create_markdown_artifact(
+        key=f"reporte-saludo-{nombre.lower()}",
+        markdown=contenido_markdown,
+        description=f"Registro de saludo generado para {nombre}."
+    )
 
-@task
-def cargar(datos: list[int]) -> None:
-    print(f"Cargando {len(datos)} registros: {datos}")
 
-# Cambia el nombre de 'etl' a 'hola'
 @flow(log_prints=True)
-def hola(): 
-    crudos = extraer()
-    limpios = transformar(crudos)
-    cargar(limpios)
+def hola(nombre: str = "mundo"):
+    # 1. Ejecutamos la tarea para obtener el saludo e imprimir logs
+    resultado_saludo = generar_saludo(nombre)
+    
+    # 2. Generamos el artefacto pasando los datos obtenidos
+    crear_reporte_saludo(nombre, resultado_saludo)
+
 
 if __name__ == "__main__":
     hola()
